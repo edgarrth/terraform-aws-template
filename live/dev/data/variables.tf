@@ -1,0 +1,22 @@
+variable "environment" { type = string }
+variable "project_name" { type = string }
+variable "name_prefix" { type = string }
+variable "aws_region" { type = string }
+variable "account_id" { type = string }
+variable "tags" { type = map(string) }
+
+variable "vpc_id" { type = string }
+variable "vpc_cidr" { type = string }
+variable "private_subnet_ids" { type = list(string) }
+variable "database_subnet_ids" { type = list(string) }
+variable "db_subnet_group_name" { type = string }
+variable "kms_key_arn" { type = string }
+variable "kms_key_id" { type = string }
+variable "postgres_instance_class" { type = string }
+variable "multi_az" { type = bool }
+variable "deletion_protection" { type = bool }
+variable "backup_retention_period" { type = number }
+variable "documentdb_instance_count" { type = number }
+variable "redis_replicas" { type = number }
+variable "redis_automatic_failover" { type = bool }
+variable "msk_broker_nodes" { type = number }
