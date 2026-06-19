@@ -2,6 +2,7 @@
 
 # Recomendacion landing zone
 Landing Zone
+```text
 ├── Foundation
 │   ├── Organizations
 │   ├── Control Tower
@@ -41,3 +42,4 @@ Landing Zone
     ├── Backup
     ├── DR
     └── Compliance
+```
