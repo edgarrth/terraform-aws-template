@@ -52,7 +52,7 @@ jobs:
         run: |
           ENVIRONMENT="${{ github.event.inputs.environment || 'dev' }}"
           LAYER="${{ github.event.inputs.layer || 'all' }}"
-          ./scripts/validate-standards.sh "$ENVIRONMENT" "$LAYER"
+          bash ./scripts/validate-standards.sh "$ENVIRONMENT" "$LAYER"
 
       - name: Run Checkov security scan
         id: checkov

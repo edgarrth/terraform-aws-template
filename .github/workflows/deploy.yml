@@ -50,4 +50,4 @@ jobs:
           terraform_version: 1.9.8
 
       - name: Deploy selected layer
-        run: ./scripts/deploy.sh "${{ github.event.inputs.environment }}" "${{ github.event.inputs.layer }}" "${{ github.event.inputs.action }}"
+        run: bash ./scripts/deploy.sh "${{ github.event.inputs.environment }}" "${{ github.event.inputs.layer }}" "${{ github.event.inputs.action }}"
