@@ -1,5 +1,6 @@
 module "networking" {
   source                = "../../../modules/networking"
+  aws_region            = var.aws_region
   name_prefix           = local.name
   vpc_cidr              = "10.30.0.0/16"
   azs = ["us-east-1a", "us-east-1b", "us-east-1c"]
