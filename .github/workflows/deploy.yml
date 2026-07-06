@@ -3,6 +3,12 @@ name: Deploy Infrastructure
 on:
   workflow_dispatch:
     inputs:
+      workload:
+        description: "Target workload"
+        required: true
+        default: "payments"
+        type: choice
+        options: [payments]
       environment:
         description: "Target environment"
         required: true
@@ -26,7 +32,7 @@ permissions:
 
 jobs:
   deploy:
-    name: Deploy ${{ github.event.inputs.environment }} / ${{ github.event.inputs.layer }}
+    name: Deploy ${{ github.event.inputs.workload }} / ${{ github.event.inputs.environment }} / ${{ github.event.inputs.layer }}
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
     env:
@@ -50,4 +56,4 @@ jobs:
           terraform_version: 1.9.8
 
       - name: Deploy selected layer
-        run: bash ./scripts/deploy.sh "${{ github.event.inputs.environment }}" "${{ github.event.inputs.layer }}" "${{ github.event.inputs.action }}"
+        run: bash ./scripts/deploy.sh "${{ github.event.inputs.workload }}" "${{ github.event.inputs.environment }}" "${{ github.event.inputs.layer }}" "${{ github.event.inputs.action }}"

@@ -1,0 +1,9 @@
+output "postgresql_endpoint" { value = module.postgresql.endpoint }
+output "documentdb_endpoint" { value = module.documentdb.endpoint }
+output "redis_primary_endpoint" { value = module.redis.primary_endpoint }
+output "msk_bootstrap_brokers_sasl_iam" { value = module.msk.bootstrap_brokers_sasl_iam }
+output "secret_arns" { value = module.secrets.secret_arns }
+output "dynamodb_table_name" { value = module.dynamodb.table_name }
+output "sns_topic_arn" { value = module.messaging.sns_topic_arn }
+output "sqs_queue_arn" { value = module.messaging.sqs_queue_arn }
+output "sqs_dlq_arn" { value = module.messaging.sqs_dlq_arn }

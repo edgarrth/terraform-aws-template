@@ -11,6 +11,12 @@ on:
       - ".github/workflows/validate-standards.yml"
   workflow_dispatch:
     inputs:
+      workload:
+        description: "Workload to validate"
+        required: true
+        default: "payments"
+        type: choice
+        options: [payments]
       environment:
         description: "Environment to validate"
         required: true
@@ -50,9 +56,10 @@ jobs:
 
       - name: Validate naming, tags and Terraform syntax
         run: |
+          WORKLOAD="${{ github.event.inputs.workload || 'payments' }}"
           ENVIRONMENT="${{ github.event.inputs.environment || 'dev' }}"
           LAYER="${{ github.event.inputs.layer || 'all' }}"
-          bash ./scripts/validate-standards.sh "$ENVIRONMENT" "$LAYER"
+          bash ./scripts/validate-standards.sh "$WORKLOAD" "$ENVIRONMENT" "$LAYER"
 
       - name: Run Checkov security scan
         id: checkov

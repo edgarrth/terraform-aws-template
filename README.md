@@ -84,26 +84,33 @@ scripts/                          # Scripts utilizados por CI/CD y despliegues l
 terraform/                        # Código de infraestructura como código (IaC).
 ├── backend/                      # Configuración del backend remoto para el estado de Terraform.
 ├── globals/                      # Variables, etiquetas y configuraciones compartidas.
-├── live/                         # Configuración por ambiente.
-│   ├── dev/                      
-│   ├── qa/                       
-│   └── prod/                     
-└── modules/                      # Módulos reutilizables de infraestructura.
-    ├── networking/               # VPC, subnets, NAT, route tables, endpoints y networking.
-    ├── eks/                      # Cluster Amazon EKS y Node Groups.
-    ├── ecr/                      # Repositorios de imágenes Docker.
-    ├── iam/                      # Roles, políticas y permisos IAM.
-    ├── kms/                      # Claves de cifrado KMS.
-    ├── secrets-manager/          # Gestión de secretos.
-    ├── messaging/                # SNS y SQS para mensajería asíncrona.
-    ├── dynamodb/                 # Tablas DynamoDB.
-    ├── aurora-postgresql/        # Clúster Aurora PostgreSQL.
-    ├── rds-postgresql/           # Instancias RDS PostgreSQL.
-    ├── documentdb/               # Clústeres Amazon DocumentDB.
-    ├── elasticache-redis/        # Clústeres ElastiCache Redis.
-    ├── msk-kafka/                # Amazon MSK (Kafka administrado).
-    ├── observability/            # CloudWatch, alarmas y monitoreo.
-    └── waf/                      # AWS WAF para protección de aplicaciones.
+├── live/                         # Configuración por workload y luego por ambiente.
+│   └── payments/                 # Workload de ejemplo reutilizable para dominios/productos.
+│       ├── dev/                  # Ambiente de desarrollo del workload.
+│       ├── qa/                   # Ambiente de pruebas del workload.
+│       └── prod/                 # Ambiente productivo del workload.
+└── modules/                      # Módulos reutilizables agrupados por dominio de Landing Zone.
+    ├── foundation/               # Servicios base de identidad, seguridad y cifrado.
+    │   ├── iam/                  # Roles, políticas y permisos IAM.
+    │   └── kms/                  # Claves de cifrado KMS.
+    ├── network/                  # Red spoke del workload.
+    │   └── networking/           # VPC, subnets, NAT, route tables, endpoints y networking.
+    ├── platform/                 # Plataforma de ejecución de microservicios.
+    │   ├── eks/                  # Cluster Amazon EKS y Node Groups.
+    │   ├── ecr/                  # Repositorios de imágenes Docker.
+    │   └── waf/                  # AWS WAF para protección de aplicaciones.
+    ├── data/                     # Servicios de persistencia, mensajería y secretos.
+    │   ├── aurora-postgresql/    # Clúster Aurora PostgreSQL.
+    │   ├── rds-postgresql/       # Instancias RDS PostgreSQL.
+    │   ├── documentdb/           # Clústeres Amazon DocumentDB.
+    │   ├── dynamodb/             # Tablas DynamoDB.
+    │   ├── elasticache-redis/    # Clústeres ElastiCache Redis.
+    │   ├── messaging/            # SNS, SQS y DLQ para mensajería asíncrona.
+    │   ├── msk-kafka/            # Amazon MSK (Kafka administrado).
+    │   └── secrets-manager/      # Gestión de secretos.
+    ├── observability/            # Monitoreo, logging y alarmas.
+    │   └── cloudwatch/           # CloudWatch Logs, alarmas y alertas.
+    └── governance/               # Estándares, políticas y validaciones sin recursos AWS directos.
 ```
 
 # Estándares
@@ -157,20 +164,20 @@ finops_allocation
 
 # Orden de despliegue
 
-Por ambiente:
+Por workload y ambiente:
 
 ```bash
-./scripts/deploy.sh dev foundation plan
-./scripts/deploy.sh dev network plan
-./scripts/deploy.sh dev platform plan
-./scripts/deploy.sh dev data plan
-./scripts/deploy.sh dev observability plan
+./scripts/deploy.sh payments dev foundation plan
+./scripts/deploy.sh payments dev network plan
+./scripts/deploy.sh payments dev platform plan
+./scripts/deploy.sh payments dev data plan
+./scripts/deploy.sh payments dev observability plan
 ```
 
 Para aplicar:
 
 ```bash
-./scripts/deploy.sh dev foundation apply
+./scripts/deploy.sh payments dev foundation apply
 ```
 
 Repetir para `qa` y `prod`.
@@ -186,13 +193,13 @@ Requisitos:
 Ejecutar todo un ambiente:
 
 ```bash
-./scripts/validate-standards.sh dev all
+./scripts/validate-standards.sh payments dev all
 ```
 
 Ejecutar una capa específica:
 
 ```bash
-./scripts/validate-standards.sh dev network
+./scripts/validate-standards.sh payments dev network
 ```
 
 # GitHub Actions
@@ -205,17 +212,12 @@ Workflow:
 .github/workflows/validate-standards.yml
 ```
 
-Requiere configurar el secreto:
-
-```text
-AWS_READONLY_ROLE_ARN
-```
+No requiere credenciales AWS para validación local o pull requests.
 
 Valida:
 
 - `terraform fmt`
 - `terraform validate`
-- `terraform plan`
 - Políticas corporativas con OPA/Conftest
 - Seguridad IaC con Checkov
 
@@ -229,6 +231,7 @@ Workflow:
 
 El despliegue es manual con `workflow_dispatch` y permite seleccionar:
 
+- Workload: `payments`
 - Ambiente: `dev`, `qa`, `prod`
 - Layer: `foundation`, `network`, `platform`, `data`, `observability`
 - Acción: `plan`, `apply`
@@ -241,10 +244,11 @@ AWS_DEPLOY_ROLE_ARN
 
 # Backend remoto
 
-Antes de aplicar, crear por ambiente:
+Antes de aplicar, crear por ambiente y workload:
 
 - Bucket S3 para estado Terraform.
 - Tabla DynamoDB para locking.
+- Claves de estado con formato `workload/environment/layer/terraform.tfstate`, por ejemplo `payments/dev/platform/terraform.tfstate`.
 
 Archivos:
 
@@ -272,15 +276,15 @@ ansible-playbook playbooks/baseline-linux.yml
 
 ### Validación de estándares
 
-El workflow `.github/workflows/validate-standards.yml` valida naming conventions, tags FinOps, formato Terraform, `terraform validate` y Checkov.
+El workflow `.github/workflows/validate-standards.yml` valida naming conventions, tags FinOps, formato Terraform, `terraform validate` y Checkov por workload, ambiente y layer.
 
 Este workflow **no requiere credenciales AWS** porque no ejecuta `terraform plan` ni consulta recursos cloud. Está diseñado para correr en pull requests y por ejecución manual.
 
 Ejecución local equivalente:
 
 ```bash
-./scripts/validate-standards.sh dev all
-./scripts/validate-standards.sh prod data
+./scripts/validate-standards.sh payments dev all
+./scripts/validate-standards.sh payments prod data
 ```
 
 ### Despliegue

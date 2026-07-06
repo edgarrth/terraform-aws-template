@@ -103,8 +103,18 @@ def check_global_tags(errors: List[str], warnings: List[str]) -> None:
         warnings.append("Shared cost resources should include allocation_rule to support FinOps showback/chargeback.")
 
 
-def check_layer_tfvars(errors: List[str]) -> None:
-    for tfvars in sorted((TERRAFORM_DIR / "live").glob("*/*/terraform.tfvars")):
+def check_layer_tfvars(errors: List[str], workload: str | None = None, environment: str | None = None, layer: str = "all") -> None:
+    pattern = "*/*/*/terraform.tfvars"
+    candidates = sorted((TERRAFORM_DIR / "live").glob(pattern))
+    for tfvars in candidates:
+        rel_parts = tfvars.relative_to(TERRAFORM_DIR / "live").parts
+        current_workload, current_environment, current_layer = rel_parts[0], rel_parts[1], rel_parts[2]
+        if workload and current_workload != workload:
+            continue
+        if environment and current_environment != environment:
+            continue
+        if layer != "all" and current_layer != layer:
+            continue
         values = parse_tfvars(tfvars)
         missing = [k for k in ["environment", "domain", "application", "component"] if k not in values]
         if missing:
@@ -159,6 +169,7 @@ def check_terraform_resources(errors: List[str], warnings: List[str]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("workload", nargs="?", default="payments")
     parser.add_argument("environment", nargs="?", default="dev")
     parser.add_argument("layer", nargs="?", default="all")
     args = parser.parse_args()
@@ -166,13 +177,16 @@ def main() -> int:
     errors: List[str] = []
     warnings: List[str] = []
 
+    live_workload_path = TERRAFORM_DIR / "live" / args.workload
+    if not live_workload_path.exists():
+        errors.append(f"Workload does not exist under terraform/live: {args.workload}")
     if args.environment not in {"dev", "qa", "prod"}:
         errors.append("Environment must be one of: dev, qa, prod")
     if args.layer not in {"all", "foundation", "network", "platform", "data", "observability"}:
         errors.append("Layer must be one of: all, foundation, network, platform, data, observability")
 
     check_global_tags(errors, warnings)
-    check_layer_tfvars(errors)
+    check_layer_tfvars(errors, args.workload, args.environment, args.layer)
     check_terraform_resources(errors, warnings)
 
     for warning in warnings:
