@@ -9,14 +9,14 @@ data "terraform_remote_state" "network" {
 }
 
 module "postgresql" {
-  source                  = "../../../modules/rds-postgresql"
-  identifier              = "${local.name}-postgresql"
+  source                  = "../../../modules/aurora-postgresql"
+  cluster_identifier      = "${local.name}-aurora-pg"
   vpc_id                  = data.terraform_remote_state.network.outputs.vpc_id
   vpc_cidr                = data.terraform_remote_state.network.outputs.vpc_cidr
   db_subnet_group_name    = data.terraform_remote_state.network.outputs.db_subnet_group_name
   kms_key_arn             = data.terraform_remote_state.foundation.outputs.kms_key_arn
-  instance_class          = "db.m6g.large"
-  multi_az                = true
+  instance_class          = "db.r6g.large"
+  instance_count          = 2
   deletion_protection     = true
   backup_retention_period = 30
   tags                    = local.tags
@@ -54,6 +54,21 @@ module "msk" {
   subnet_ids             = data.terraform_remote_state.network.outputs.private_subnet_ids
   number_of_broker_nodes = 3
   tags                   = local.tags
+}
+
+module "dynamodb" {
+  source                         = "../../../modules/dynamodb"
+  name                           = "${local.name}-merchant-profile-ddb"
+  kms_key_arn                    = data.terraform_remote_state.foundation.outputs.kms_key_arn
+  point_in_time_recovery_enabled = var.environment == "prod" ? true : false
+  tags                           = merge(local.tags, { component = "dynamodb", finops_allocation = "direct", backup_required = var.environment == "prod" ? "true" : "false" })
+}
+
+module "messaging" {
+  source      = "../../../modules/messaging"
+  name_prefix = local.name
+  kms_key_arn = data.terraform_remote_state.foundation.outputs.kms_key_arn
+  tags        = merge(local.tags, { component = "messaging", finops_allocation = "shared" })
 }
 
 module "secrets" {

@@ -1,4 +1,25 @@
 environment = "prod"
-name_prefix = "acme-ms"
-aws_region = "us-east-1"
-common_tags = { owner="platform-team", project="java-microservices", managed_by="terraform", cost_center="technology" }
+name_prefix = "acme-pay-platform-microservices-shared-prod-ue1"
+aws_region  = "us-east-1"
+
+common_tags = {
+  organization        = "acme"
+  business_unit       = "pay"
+  domain              = "platform"
+  application         = "microservices"
+  component           = "observability"
+  owner               = "platform-team"
+  technical_owner     = "architecture"
+  cost_center         = "cc-technology"
+  product             = "microservices-platform"
+  squad               = "platform-squad"
+  criticality         = "high"
+  data_classification = "internal"
+  compliance          = "internal"
+  managed_by          = "terraform"
+  repository          = "terraform-aws-template"
+  lifecycle           = "active"
+  backup_required     = "false"
+  dr_required         = "false"
+  finops_allocation   = "observability"
+}

@@ -1,0 +1,56 @@
+---
+- name: Configure baseline for EC2 nodes where Ansible applies
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Install operational packages
+      ansible.builtin.package:
+        name: "{{ standard_packages }}"
+        state: present
+
+    - name: Ensure journald persistent directory exists
+      ansible.builtin.file:
+        path: /var/log/journal
+        state: directory
+        mode: "0755"
+
+    - name: Configure sysctl hardening baseline
+      ansible.posix.sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: true
+      loop:
+        - { name: net.ipv4.conf.all.send_redirects, value: "0" }
+        - { name: net.ipv4.conf.default.send_redirects, value: "0" }
+        - { name: net.ipv4.tcp_syncookies, value: "1" }
+
+    - name: Create CloudWatch agent directory
+      ansible.builtin.file:
+        path: "{{ cloudwatch_agent_config_path | dirname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Install CloudWatch agent config
+      ansible.builtin.copy:
+        dest: "{{ cloudwatch_agent_config_path }}"
+        mode: "0644"
+        content: |
+          {
+            "agent": { "metrics_collection_interval": 60 },
+            "logs": {
+              "logs_collected": {
+                "files": {
+                  "collect_list": [
+                    {
+                      "file_path": "/var/log/messages",
+                      "log_group_name": "/platform/linux/baseline",
+                      "log_stream_name": "{instance_id}"
+                    }
+                  ]
+                }
+              }
+            }
+          }

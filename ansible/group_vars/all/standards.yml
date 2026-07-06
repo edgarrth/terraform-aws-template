@@ -1,0 +1,6 @@
+standard_packages:
+  - amazon-cloudwatch-agent
+  - jq
+  - unzip
+
+cloudwatch_agent_config_path: /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json

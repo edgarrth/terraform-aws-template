@@ -9,16 +9,16 @@ data "terraform_remote_state" "network" {
 }
 
 module "postgresql" {
-  source                  = "../../../modules/rds-postgresql"
-  identifier              = "${local.name}-postgresql"
+  source                  = "../../../modules/aurora-postgresql"
+  cluster_identifier      = "${local.name}-aurora-pg"
   vpc_id                  = data.terraform_remote_state.network.outputs.vpc_id
   vpc_cidr                = data.terraform_remote_state.network.outputs.vpc_cidr
   db_subnet_group_name    = data.terraform_remote_state.network.outputs.db_subnet_group_name
   kms_key_arn             = data.terraform_remote_state.foundation.outputs.kms_key_arn
-  instance_class          = "db.t4g.medium"
-  multi_az                = false
-  deletion_protection     = false
-  backup_retention_period = 7
+  instance_class          = var.environment == "prod" ? "db.r6g.large" : "db.t4g.medium"
+  instance_count          = var.environment == "prod" ? 2 : 1
+  deletion_protection     = var.environment == "prod" ? true : false
+  backup_retention_period = var.environment == "prod" ? 14 : 7
   tags                    = local.tags
 }
 
@@ -29,9 +29,9 @@ module "documentdb" {
   vpc_cidr                = data.terraform_remote_state.network.outputs.vpc_cidr
   subnet_ids              = data.terraform_remote_state.network.outputs.database_subnet_ids
   kms_key_arn             = data.terraform_remote_state.foundation.outputs.kms_key_arn
-  instance_count          = 1
-  deletion_protection     = false
-  backup_retention_period = 7
+  instance_count          = var.environment == "prod" ? 2 : 1
+  deletion_protection     = var.environment == "prod" ? true : false
+  backup_retention_period = var.environment == "prod" ? 14 : 7
   tags                    = local.tags
 }
 
@@ -54,6 +54,21 @@ module "msk" {
   subnet_ids             = data.terraform_remote_state.network.outputs.private_subnet_ids
   number_of_broker_nodes = 2
   tags                   = local.tags
+}
+
+module "dynamodb" {
+  source                         = "../../../modules/dynamodb"
+  name                           = "${local.name}-merchant-profile-ddb"
+  kms_key_arn                    = data.terraform_remote_state.foundation.outputs.kms_key_arn
+  point_in_time_recovery_enabled = var.environment == "prod" ? true : false
+  tags                           = merge(local.tags, { component = "dynamodb", finops_allocation = "direct", backup_required = var.environment == "prod" ? "true" : "false" })
+}
+
+module "messaging" {
+  source      = "../../../modules/messaging"
+  name_prefix = local.name
+  kms_key_arn = data.terraform_remote_state.foundation.outputs.kms_key_arn
+  tags        = merge(local.tags, { component = "messaging", finops_allocation = "shared" })
 }
 
 module "secrets" {

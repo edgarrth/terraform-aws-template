@@ -1,0 +1,83 @@
+name: Validate IaC Standards
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "terraform/**"
+      - "policy/**"
+      - "scripts/**"
+      - "ansible/**"
+      - ".github/workflows/validate-standards.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to validate"
+        required: true
+        default: "dev"
+        type: choice
+        options: [dev, qa, prod]
+      layer:
+        description: "Layer to validate"
+        required: true
+        default: "all"
+        type: choice
+        options: [all, foundation, network, platform, data, observability]
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: write
+  id-token: write
+
+jobs:
+  validate:
+    name: Terraform, Checkov and OPA
+    runs-on: ubuntu-latest
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      AWS_REGION: us-east-1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_READONLY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Install Conftest
+        run: |
+          curl -L -o conftest.tar.gz https://github.com/open-policy-agent/conftest/releases/download/v0.56.0/conftest_0.56.0_Linux_x86_64.tar.gz
+          tar xzf conftest.tar.gz
+          sudo mv conftest /usr/local/bin/conftest
+          conftest --version
+
+      - name: Validate standards with OPA
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment || 'dev' }}"
+          LAYER="${{ github.event.inputs.layer || 'all' }}"
+          ./scripts/validate-standards.sh "$ENVIRONMENT" "$LAYER"
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform
+          framework: terraform
+          output_format: cli,sarif
+          output_file_path: console,checkov-results.sarif
+          soft_fail: false
+
+      - name: Upload Checkov SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov-results.sarif
