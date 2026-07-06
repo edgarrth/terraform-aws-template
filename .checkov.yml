@@ -1,0 +1,26 @@
+# Checkov baseline for this reference template.
+# Corporate standards are enforced hard by scripts/validate-standards.sh.
+# Checkov is kept as a security posture report and SARIF producer.
+framework:
+  - terraform
+soft-fail: true
+skip-check:
+  # These checks require organization-specific runtime decisions, AWS Backup plans,
+  # centralized logging accounts, rotation Lambdas, or paid observability settings.
+  - CKV_AWS_382   # Egress 0.0.0.0/0:0 to -1; governed by SG standards and private subnets
+  - CKV_AWS_23    # SG/rule descriptions; modules already include meaningful names/tags
+  - CKV_AWS_39    # EKS private endpoint; dev/qa may require controlled public access
+  - CKV_AWS_38    # EKS public endpoint CIDR; environment-driven
+  - CKV_AWS_58    # EKS secrets encryption; requires KMS integration per account
+  - CKV_AWS_31    # Redis auth token; optional depending on auth model
+  - CKV_AWS_80    # MSK broker logging; centralized logging decision
+  - CKV_AWS_130   # Public subnet assigns public IP by design for ingress/NAT tier
+  - CKV_AWS_338   # 1-year logs; non-prod retention is intentionally lower
+  - CKV_AWS_192   # WAF Log4j managed rule; enable per edge/app exposure
+  - CKV2_AWS_12   # Default SG restrictive rules; handled by org AWS Config/SCP
+  - CKV2_AWS_31   # WAF logging; needs target delivery stream/log group
+  - CKV2_AWS_8    # AWS Backup plan; often centralized outside workload stack
+  - CKV2_AWS_11   # VPC flow logs; often centralized outside workload stack
+  - CKV2_AWS_57   # Secret rotation; requires app-specific rotation Lambda
+  - CKV2_AWS_64   # KMS key policy; default provider policy may be acceptable in template
+  - CKV2_AWS_19   # EIP attachment for NAT may be unresolved in static scan

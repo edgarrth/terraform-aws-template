@@ -312,3 +312,11 @@ Ejecución local equivalente:
 
 El workflow `.github/workflows/deploy.yml` sí requiere OIDC y el secret `AWS_DEPLOY_ROLE_ARN`, porque ejecuta `terraform plan` o `terraform apply` contra AWS.
 
+
+## Nota sobre Checkov
+
+La validación corporativa de naming, tags, FinOps y sintaxis Terraform es **bloqueante** y se ejecuta con `scripts/validate-standards.sh`.
+
+Checkov se ejecuta como análisis de seguridad y genera SARIF, pero queda en modo **advisory/soft-fail** porque algunas reglas requieren decisiones organizacionales externas al template, por ejemplo AWS Backup centralizado, VPC Flow Logs centralizados, rotación de secretos con Lambda, logging WAF/MSK o políticas SCP/AWS Config.
+
+Las exclusiones documentadas están en `.checkov.yml`.
