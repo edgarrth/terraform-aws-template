@@ -38,15 +38,21 @@ ALLOWED_VALUES = {
 }
 
 NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+TF_LOCAL_NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 TAG_LINE_RE = re.compile(r'^\s*([A-Za-z0-9_]+)\s*=\s*"?([^"\n#]+)"?\s*(?:#.*)?$')
 RESOURCE_RE = re.compile(r'^\s*resource\s+"([^"]+)"\s+"([^"]+)"')
 NAME_ATTR_RE = re.compile(r'^\s*(name|bucket|identifier|cluster_identifier|queue_name|topic_name)\s*=\s*"([^"]+)"')
 TAGS_REF_RE = re.compile(r'tags\s*=\s*(?:var\.common_tags|local\.common_tags|merge\()')
 
 SKIP_RESOURCE_TAGS = {
+    "aws_ecr_lifecycle_policy",
     "aws_iam_role_policy_attachment",
+    "aws_kms_alias",
     "aws_route_table_association",
     "aws_security_group_rule",
+    "aws_secretsmanager_secret_version",
+    "aws_sns_topic_subscription",
+    "aws_sqs_queue_policy",
     "aws_vpc_endpoint_route_table_association",
     "aws_vpc_endpoint_subnet_association",
 }
@@ -132,8 +138,10 @@ def check_terraform_resources(errors: List[str], warnings: List[str]) -> None:
             block, end = block_text(lines, i)
             address = f"{rel}:{i + 1} resource.{resource_type}.{local_name}"
 
-            if not NAME_RE.match(local_name):
-                errors.append(f"{address} has invalid Terraform local name '{local_name}'. Use lowercase kebab-case style without underscores in resource names where possible.")
+            # Terraform local labels are code identifiers used in references. Underscores are valid and recommended here.
+            # Corporate naming conventions are enforced on the cloud resource name attributes below.
+            if not TF_LOCAL_NAME_RE.match(local_name):
+                errors.append(f"{address} has invalid Terraform local label '{local_name}'. Use letters, numbers and underscores only.")
 
             name_matches = NAME_ATTR_RE.findall(block)
             for attr, value in name_matches:

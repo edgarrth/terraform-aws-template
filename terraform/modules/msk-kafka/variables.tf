@@ -20,5 +20,5 @@ variable "ebs_volume_size" {
 }
 variable "tags" {
   type    = map(string)
-  default = {
-} }
+  default = {}
+}

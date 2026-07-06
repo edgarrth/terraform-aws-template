@@ -17,5 +17,5 @@ variable "visibility_timeout_seconds" {
 }
 variable "tags" {
   type    = map(string)
-  default = {
-} }
+  default = {}
+}

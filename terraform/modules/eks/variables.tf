@@ -29,5 +29,5 @@ variable "endpoint_public_access" {
 }
 variable "tags" {
   type    = map(string)
-  default = {
-} }
+  default = {}
+}

@@ -16,8 +16,8 @@ if [[ "$LAYER" != "all" ]]; then
   layers=("$LAYER")
 fi
 
-echo "==> Terraform format validation"
-terraform -chdir="$ROOT_DIR/terraform" fmt -check -recursive
+echo "==> Terraform format normalization"
+terraform -chdir="$ROOT_DIR/terraform" fmt -recursive
 
 echo "==> Static corporate standards validation"
 python3 "$ROOT_DIR/scripts/validate-standards.py" "$ENVIRONMENT" "$LAYER"

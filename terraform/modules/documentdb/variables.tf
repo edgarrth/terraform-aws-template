@@ -28,5 +28,5 @@ variable "deletion_protection" {
 }
 variable "tags" {
   type    = map(string)
-  default = {
-} }
+  default = {}
+}

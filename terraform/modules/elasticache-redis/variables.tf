@@ -16,5 +16,5 @@ variable "automatic_failover_enabled" {
 }
 variable "tags" {
   type    = map(string)
-  default = {
-} }
+  default = {}
+}

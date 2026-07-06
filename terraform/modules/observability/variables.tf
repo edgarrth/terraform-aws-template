@@ -9,5 +9,5 @@ variable "create_container_log_group" {
 }
 variable "tags" {
   type    = map(string)
-  default = {
-} }
+  default = {}
+}

@@ -4,11 +4,25 @@ resource "random_password" "master" {
 }
 
 resource "aws_security_group" "this" {
-  name   = "${var.identifier}-postgresql-sg"
-  vpc_id = var.vpc_id
-  ingress { from_port = 5432 to_port = 5432 protocol = "tcp" cidr_blocks = [var.vpc_cidr] }
-  egress { from_port = 0 to_port = 0 protocol = "-1" cidr_blocks = ["0.0.0.0/0"] }
-  tags = var.tags
+  name        = "${var.identifier}-postgresql-sg"
+  description = "RDS PostgreSQL security group"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(var.tags, { Name = "${var.identifier}-postgresql-sg" })
 }
 
 resource "aws_db_instance" "this" {
@@ -30,5 +44,5 @@ resource "aws_db_instance" "this" {
   skip_final_snapshot         = !var.deletion_protection
   publicly_accessible         = false
   auto_minor_version_upgrade  = true
-  tags                        = var.tags
+  tags                        = merge(var.tags, { Name = var.identifier })
 }

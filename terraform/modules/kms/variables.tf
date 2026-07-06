@@ -13,5 +13,5 @@ variable "enable_key_rotation" {
 }
 variable "tags" {
   type    = map(string)
-  default = {
-} }
+  default = {}
+}

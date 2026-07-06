@@ -21,5 +21,5 @@ variable "kms_key_arn" {
 }
 variable "tags" {
   type    = map(string)
-  default = {
-} }
+  default = {}
+}

@@ -57,7 +57,10 @@ resource "aws_nat_gateway" "this" {
 
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.this.id
-  route { cidr_block = "0.0.0.0/0" gateway_id = aws_internet_gateway.this.id }
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.this.id
+  }
   tags = merge(var.tags, { Name = "${var.name_prefix}-public-rt" })
 }
 
@@ -71,7 +74,10 @@ resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id
   dynamic "route" {
     for_each = var.enable_nat_gateway ? [1] : []
-    content { cidr_block = "0.0.0.0/0" nat_gateway_id = aws_nat_gateway.this[0].id }
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.this[0].id
+    }
   }
   tags = merge(var.tags, { Name = "${var.name_prefix}-private-rt" })
 }
@@ -85,7 +91,7 @@ resource "aws_route_table_association" "private" {
 resource "aws_db_subnet_group" "database" {
   name       = "${var.name_prefix}-db-subnet-group"
   subnet_ids = [for s in aws_subnet.database : s.id]
-  tags       = var.tags
+  tags       = merge(var.tags, { Name = "${var.name_prefix}-db-subnet-group" })
 }
 
 resource "aws_vpc_endpoint" "s3" {

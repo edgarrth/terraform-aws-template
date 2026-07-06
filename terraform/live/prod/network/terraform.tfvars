@@ -8,6 +8,7 @@ common_tags = {
   domain              = "platform"
   application         = "microservices"
   component           = "network"
+  environment         = "prod"
   owner               = "platform-team"
   technical_owner     = "architecture"
   cost_center         = "cc-technology"

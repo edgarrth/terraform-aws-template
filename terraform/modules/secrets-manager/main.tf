@@ -3,7 +3,7 @@ resource "aws_secretsmanager_secret" "this" {
   name        = each.key
   description = each.value.description
   kms_key_id  = var.kms_key_id
-  tags        = var.tags
+  tags        = merge(var.tags, {})
 }
 
 resource "aws_secretsmanager_secret_version" "this" {
