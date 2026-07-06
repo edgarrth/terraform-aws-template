@@ -55,49 +55,55 @@ Governance
 # Estructura
 
 ```text
-.github/workflows/
-├── validate-standards.yml
-└── deploy.yml
+.github/
+└── workflows/                    # Pipelines de GitHub Actions para validación y despliegue.
+    ├── validate-standards.yml    # Valida estándares, Terraform y políticas de seguridad.
+    └── deploy.yml                # Despliega la infraestructura mediante Terraform.
 
-ansible/
-├── ansible.cfg
-├── inventory/aws_ec2.yml
-├── group_vars/all/standards.yml
-└── playbooks/baseline-linux.yml
+ansible/                          # Automatización de configuración posterior al aprovisionamiento.
+├── ansible.cfg                   # Configuración global de Ansible.
+├── inventory/
+│   └── aws_ec2.yml               # Inventario dinámico utilizando AWS EC2.
+├── group_vars/
+│   └── all/
+│       └── standards.yml         # Variables y configuraciones comunes.
+└── playbooks/
+    └── baseline-linux.yml        # Configuración base para instancias Linux.
 
-docs/standards/
-└── infra-standards.md
+docs/
+└── standards/                    # Documentación de estándares de infraestructura.
+    └── infra-standards.md        # Naming conventions, tagging, FinOps y buenas prácticas.
 
-policy/
-└── terraform_standards.rego
+policy/                           # Políticas corporativas utilizadas durante la validación.
+└── terraform_standards.rego      # Reglas OPA/Rego para validar Terraform.
 
-scripts/
-├── validate-standards.sh
-└── deploy.sh
+scripts/                          # Scripts utilizados por CI/CD y despliegues locales.
+├── validate-standards.sh         # Ejecuta validaciones de formato, estándares y Terraform.
+└── deploy.sh                     # Ejecuta el despliegue automatizado.
 
-terraform/
-├── backend/
-├── globals/
-├── live/
-│   ├── dev/
-│   ├── qa/
-│   └── prod/
-└── modules/
-    ├── dynamodb/
-    ├── messaging/
-    ├── networking/
-    ├── eks/
-    ├── ecr/
-    ├── aurora-postgresql/
-    ├── rds-postgresql/
-    ├── documentdb/
-    ├── elasticache-redis/
-    ├── msk-kafka/
-    ├── secrets-manager/
-    ├── observability/
-    ├── iam/
-    ├── kms/
-    └── waf/
+terraform/                        # Código de infraestructura como código (IaC).
+├── backend/                      # Configuración del backend remoto para el estado de Terraform.
+├── globals/                      # Variables, etiquetas y configuraciones compartidas.
+├── live/                         # Configuración por ambiente.
+│   ├── dev/                      
+│   ├── qa/                       
+│   └── prod/                     
+└── modules/                      # Módulos reutilizables de infraestructura.
+    ├── networking/               # VPC, subnets, NAT, route tables, endpoints y networking.
+    ├── eks/                      # Cluster Amazon EKS y Node Groups.
+    ├── ecr/                      # Repositorios de imágenes Docker.
+    ├── iam/                      # Roles, políticas y permisos IAM.
+    ├── kms/                      # Claves de cifrado KMS.
+    ├── secrets-manager/          # Gestión de secretos.
+    ├── messaging/                # SNS y SQS para mensajería asíncrona.
+    ├── dynamodb/                 # Tablas DynamoDB.
+    ├── aurora-postgresql/        # Clúster Aurora PostgreSQL.
+    ├── rds-postgresql/           # Instancias RDS PostgreSQL.
+    ├── documentdb/               # Clústeres Amazon DocumentDB.
+    ├── elasticache-redis/        # Clústeres ElastiCache Redis.
+    ├── msk-kafka/                # Amazon MSK (Kafka administrado).
+    ├── observability/            # CloudWatch, alarmas y monitoreo.
+    └── waf/                      # AWS WAF para protección de aplicaciones.
 ```
 
 # Estándares
@@ -119,7 +125,7 @@ Formato base:
 Ejemplo:
 
 ```text
-acme-pay-platform-microservices-shared-dev-ue1-vpc
+axiz-pay-platform-microservices-shared-dev-ue1-vpc
 ```
 
 # Tags obligatorios
@@ -262,37 +268,6 @@ ansible-galaxy collection install amazon.aws ansible.posix
 ansible-playbook playbooks/baseline-linux.yml
 ```
 
-# Consideraciones FinOps
-
-- Activar los Cost Allocation Tags en AWS Billing.
-- Revisar costos de EKS, NAT Gateway, MSK, DocumentDB y endpoints privados.
-- Usar `finops_allocation` para separar costos directos, compartidos, plataforma, seguridad, red y observabilidad.
-- Los recursos experimentales deben tener `expiration_date`.
-- Ambientes no productivos deben tener estrategia de apagado cuando aplique.
-
-# Consideraciones de seguridad
-
-- No usar acceso público salvo excepción.
-- Usar cifrado con KMS en datos y mensajería.
-- No guardar secretos en repositorio.
-- Usar Secrets Manager.
-- Aplicar mínimo privilegio en IAM.
-- Revisar hallazgos de Checkov antes de merge.
-
-# Pendientes recomendados para producción real
-
-- AWS Organizations y SCPs.
-- Control Tower Account Factory.
-- GuardDuty y Security Hub organizacional.
-- External Secrets Operator.
-- AWS Load Balancer Controller.
-- Karpenter.
-- Network Policies.
-- AWS Backup centralizado.
-- GitOps con Argo CD.
-- Service Mesh si existe necesidad real de mTLS, traffic shifting o políticas avanzadas.
-
-
 ## GitHub Actions
 
 ### Validación de estándares
@@ -315,8 +290,13 @@ El workflow `.github/workflows/deploy.yml` sí requiere OIDC y el secret `AWS_DE
 
 ## Nota sobre Checkov
 
-La validación corporativa de naming, tags, FinOps y sintaxis Terraform es **bloqueante** y se ejecuta con `scripts/validate-standards.sh`.
+La validación corporativa de naming, tags, FinOps y sintaxis Terraform 
+es **bloqueante** y se ejecuta con `scripts/validate-standards.sh`.
 
-Checkov se ejecuta como análisis de seguridad y genera SARIF, pero queda en modo **advisory/soft-fail** porque algunas reglas requieren decisiones organizacionales externas al template, por ejemplo AWS Backup centralizado, VPC Flow Logs centralizados, rotación de secretos con Lambda, logging WAF/MSK o políticas SCP/AWS Config.
+Checkov se ejecuta como análisis de seguridad y genera SARIF, 
+pero queda en modo **advisory/soft-fail** porque algunas reglas 
+requieren decisiones organizacionales externas al template, 
+por ejemplo AWS Backup centralizado, VPC Flow Logs centralizados, 
+rotación de secretos con Lambda, logging WAF/MSK o políticas SCP/AWS Config.
 
 Las exclusiones documentadas están en `.checkov.yml`.

@@ -33,7 +33,7 @@ Definir las reglas mínimas para nombrar, etiquetar, validar y operar recursos d
 # 3.3 Ejemplo
 
 ```text
-acme-pay-platform-microservices-shared-dev-ue1-vpc
+axiz-pay-platform-microservices-shared-dev-ue1-vpc
 ```
 
 # 4. Ambientes
