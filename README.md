@@ -1,8 +1,6 @@
 # Terraform AWS Microservices Landing Zone
 
-Repositorio de referencia para una plataforma AWS de microservicios con 
-Terraform, estándares de naming/tagging/FinOps, validación automática con 
-OPA/Conftest, seguridad IaC con Checkov y configuración opcional con Ansible.
+Repositorio de referencia para una plataforma AWS de microservicios con Terraform, estándares de naming/tagging/FinOps, validación automática con OPA/Conftest, seguridad IaC con Checkov y configuración opcional con Ansible.
 
 # Arquitectura incluida
 
@@ -121,7 +119,7 @@ Formato base:
 Ejemplo:
 
 ```text
-axiz-pay-platform-microservices-shared-dev-ue1-vpc
+acme-pay-platform-microservices-shared-dev-ue1-vpc
 ```
 
 # Tags obligatorios
@@ -252,8 +250,9 @@ terraform/backend/prod.hcl
 
 # Ansible
 
-Ansible se incluye solo para configuraciones donde aplica, 
-principalmente baseline Linux en EC2 administradas.
+Ansible se incluye solo para configuraciones donde aplica, principalmente baseline Linux en EC2 administradas.
+
+No se usa Ansible para crear servicios administrados AWS. Esa responsabilidad queda en Terraform.
 
 Ejemplo:
 
@@ -262,3 +261,54 @@ cd ansible
 ansible-galaxy collection install amazon.aws ansible.posix
 ansible-playbook playbooks/baseline-linux.yml
 ```
+
+# Consideraciones FinOps
+
+- Activar los Cost Allocation Tags en AWS Billing.
+- Revisar costos de EKS, NAT Gateway, MSK, DocumentDB y endpoints privados.
+- Usar `finops_allocation` para separar costos directos, compartidos, plataforma, seguridad, red y observabilidad.
+- Los recursos experimentales deben tener `expiration_date`.
+- Ambientes no productivos deben tener estrategia de apagado cuando aplique.
+
+# Consideraciones de seguridad
+
+- No usar acceso público salvo excepción.
+- Usar cifrado con KMS en datos y mensajería.
+- No guardar secretos en repositorio.
+- Usar Secrets Manager.
+- Aplicar mínimo privilegio en IAM.
+- Revisar hallazgos de Checkov antes de merge.
+
+# Pendientes recomendados para producción real
+
+- AWS Organizations y SCPs.
+- Control Tower Account Factory.
+- GuardDuty y Security Hub organizacional.
+- External Secrets Operator.
+- AWS Load Balancer Controller.
+- Karpenter.
+- Network Policies.
+- AWS Backup centralizado.
+- GitOps con Argo CD.
+- Service Mesh si existe necesidad real de mTLS, traffic shifting o políticas avanzadas.
+
+
+## GitHub Actions
+
+### Validación de estándares
+
+El workflow `.github/workflows/validate-standards.yml` valida naming conventions, tags FinOps, formato Terraform, `terraform validate` y Checkov.
+
+Este workflow **no requiere credenciales AWS** porque no ejecuta `terraform plan` ni consulta recursos cloud. Está diseñado para correr en pull requests y por ejecución manual.
+
+Ejecución local equivalente:
+
+```bash
+./scripts/validate-standards.sh dev all
+./scripts/validate-standards.sh prod data
+```
+
+### Despliegue
+
+El workflow `.github/workflows/deploy.yml` sí requiere OIDC y el secret `AWS_DEPLOY_ROLE_ARN`, porque ejecuta `terraform plan` o `terraform apply` contra AWS.
+

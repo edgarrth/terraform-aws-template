@@ -2,9 +2,7 @@
 
 # 1. Objetivo
 
-Definir las reglas mínimas para nombrar, etiquetar, validar y 
-operar recursos de infraestructura AWS y Kubernetes para una 
-arquitectura de microservicios.
+Definir las reglas mínimas para nombrar, etiquetar, validar y operar recursos de infraestructura AWS y Kubernetes para una arquitectura profesional de microservicios.
 
 # 2. Principios
 
@@ -35,7 +33,7 @@ arquitectura de microservicios.
 # 3.3 Ejemplo
 
 ```text
-axiz-pay-platform-microservices-shared-dev-ue1-vpc
+acme-pay-platform-microservices-shared-dev-ue1-vpc
 ```
 
 # 4. Ambientes
