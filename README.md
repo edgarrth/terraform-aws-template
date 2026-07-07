@@ -112,7 +112,55 @@ terraform/                        # Código de infraestructura como código (IaC
     │   └── cloudwatch/           # CloudWatch Logs, alarmas y alertas.
     └── governance/               # Estándares, políticas y validaciones sin recursos AWS directos.
 ```
+# Herramientas de validación y calidad
 
+La infraestructura implementa una estrategia de **Shift Left**, validando la calidad, seguridad y cumplimiento antes de desplegar cualquier cambio.
+
+| Herramienta | Propósito | ¿Qué valida? |
+|------------|-----------|--------------|
+| **Terraform fmt** | Estandarización del código | Formato oficial de Terraform. |
+| **Terraform validate** | Validación sintáctica | Sintaxis HCL, referencias, variables y estructura del proyecto. |
+| **OPA / Conftest (Rego)** | Policy as Code | Valida Naming Conventions, Tags obligatorios, FinOps, reglas corporativas y estándares definidos por la organización. Es la fuente oficial de políticas. |
+| **Python Validator** | Validaciones estructurales | Verifica la estructura del repositorio, organización de carpetas, módulos, workloads, convenciones del proyecto y reglas que no pueden expresarse fácilmente en Rego. |
+| **Checkov** | Seguridad de Infraestructura (IaC Security) | Detecta configuraciones inseguras en Terraform utilizando las mejores prácticas de AWS y estándares CIS. |
+| **TFLint** | Buenas prácticas Terraform | Detecta errores comunes, recursos obsoletos, atributos inválidos y recomendaciones específicas del proveedor AWS. |
+| **GitHub Actions** | Automatización CI/CD | Ejecuta automáticamente todas las validaciones en Pull Requests y despliegues. |
+| **SARIF** | Reporte de seguridad | Formato estándar utilizado por GitHub Code Scanning para visualizar los hallazgos de Checkov y otras herramientas de análisis estático. |
+
+# Flujo de validación
+
+Cada Pull Request ejecuta el siguiente flujo:
+
+```text
+Terraform fmt
+        │
+        ▼
+Python Validator
+        │
+        ▼
+Terraform validate
+        │
+        ▼
+OPA / Conftest (Rego)
+        │
+        ▼
+TFLint
+        │
+        ▼
+Checkov
+        │
+        ▼
+Generación del reporte SARIF
+        │
+        ▼
+Publicación en GitHub Code Scanning + Artifacts
+```
+> **Nota**
+>
+> Las políticas corporativas (Naming Conventions, Tags, FinOps, etc.) se definen exclusivamente en `policy/terraform_standards.rego`.
+>
+> El script `validate-standards.py` valida la estructura del repositorio y otras verificaciones que no pueden expresarse fácilmente mediante OPA/Rego.
+> 
 # Estándares
 
 Los estándares completos están en:
@@ -127,7 +175,7 @@ La fuente oficial de políticas automatizadas para naming, tags, FinOps y valore
 policy/terraform_standards.rego
 ```
 
-`scripts/validate-standards.py` no duplica esas políticas; solo valida estructura del repositorio, existencia de capas, rutas locales de módulos, workflows y archivos requeridos.
+`scripts/validate-standards.py` solo valida estructura del repositorio, existencia de capas, rutas locales de módulos, workflows y archivos requeridos.
 
 # Naming convention
 
