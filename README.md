@@ -121,6 +121,14 @@ Los estándares completos están en:
 docs/standards/infra-standards.md
 ```
 
+La fuente oficial de políticas automatizadas para naming, tags, FinOps y valores permitidos es:
+
+```text
+policy/terraform_standards.rego
+```
+
+`scripts/validate-standards.py` no duplica esas políticas; solo valida estructura del repositorio, existencia de capas, rutas locales de módulos, workflows y archivos requeridos.
+
 # Naming convention
 
 Formato base:
@@ -187,7 +195,7 @@ Repetir para `qa` y `prod`.
 Requisitos:
 
 - Terraform >= 1.6
-- Conftest
+- Conftest para validar planes Terraform con las políticas OPA/Rego
 - Checkov opcional para ejecución local
 
 Ejecutar todo un ambiente:
@@ -218,7 +226,8 @@ Valida:
 
 - `terraform fmt`
 - `terraform validate`
-- Políticas corporativas con OPA/Conftest
+- Estructura del repositorio con `scripts/validate-standards.py`
+- Políticas corporativas oficiales con `policy/terraform_standards.rego` durante `plan/apply`
 - Seguridad IaC con Checkov
 
 # 2. Despliegue
@@ -276,7 +285,7 @@ ansible-playbook playbooks/baseline-linux.yml
 
 ### Validación de estándares
 
-El workflow `.github/workflows/validate-standards.yml` valida naming conventions, tags FinOps, formato Terraform, `terraform validate` y Checkov por workload, ambiente y layer.
+El workflow `.github/workflows/validate-standards.yml` valida estructura del repositorio, formato Terraform, `terraform validate` y Checkov por workload, ambiente y layer. Las reglas corporativas de naming, tags, FinOps y valores permitidos se mantienen como fuente oficial en `policy/terraform_standards.rego` y se aplican sobre el plan Terraform durante el despliegue.
 
 Este workflow **no requiere credenciales AWS** porque no ejecuta `terraform plan` ni consulta recursos cloud. Está diseñado para correr en pull requests y por ejecución manual.
 
@@ -297,8 +306,9 @@ El workflow `.github/workflows/deploy.yml` sí requiere OIDC y el secret `AWS_DE
 La validación corporativa de naming, tags, FinOps y sintaxis Terraform 
 es **bloqueante** y se ejecuta con `scripts/validate-standards.sh`.
 
-Checkov se ejecuta como análisis de seguridad y genera SARIF, 
-pero queda en modo **advisory/soft-fail** porque algunas reglas 
+Checkov se ejecuta como análisis de seguridad y genera SARIF. El archivo `checkov-results.sarif` se publica en GitHub Code Scanning y también queda disponible como artifact descargable del workflow.
+
+Checkov queda en modo **advisory/soft-fail** porque algunas reglas 
 requieren decisiones organizacionales externas al template, 
 por ejemplo AWS Backup centralizado, VPC Flow Logs centralizados, 
 rotación de secretos con Lambda, logging WAF/MSK o políticas SCP/AWS Config.

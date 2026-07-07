@@ -78,3 +78,11 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: checkov-results.sarif
+      - name: Upload Checkov SARIF Artifact
+        if: ${{ always() && hashFiles('checkov-results.sarif') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-results-sarif
+          path: checkov-results.sarif
+          retention-days: 30
+

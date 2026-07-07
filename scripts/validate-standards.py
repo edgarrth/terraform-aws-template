@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Static corporate standards validator for this Terraform template.
-It does not require AWS credentials. It validates:
-- mandatory FinOps/common tags in terraform/globals/tags.tfvars
-- allowed values for key tags
-- layer/environment tfvars include common tags
-- common resource naming style in Terraform source files
-- production data resources require backup/dr flags through common tags
+Repository structure validator for this Terraform Landing Zone Workload template.
+
+Important:
+- Corporate policy rules for naming, tags, FinOps and allowed values live in policy/terraform_standards.rego.
+- This script intentionally does NOT duplicate those policy lists.
+- This script validates repository concerns that are easier to check before Terraform plan/OPA, such as folder layout,
+  required files, workload/environment/layer structure, module paths and CI/CD wiring.
 """
 from __future__ import annotations
 
@@ -14,157 +14,132 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Iterable, List
 
 ROOT = Path(__file__).resolve().parents[1]
 TERRAFORM_DIR = ROOT / "terraform"
 
-REQUIRED_TAGS = {
-    "organization", "business_unit", "domain", "application", "component", "environment",
-    "owner", "technical_owner", "cost_center", "product", "squad", "criticality",
-    "data_classification", "compliance", "managed_by", "repository", "lifecycle",
-    "backup_required", "dr_required", "finops_allocation",
-}
-
-ALLOWED_VALUES = {
-    "environment": {"dev", "qa", "stg", "uat", "prod", "prd", "dr", "sbx"},
-    "criticality": {"low", "medium", "high", "critical"},
-    "data_classification": {"public", "internal", "confidential", "restricted"},
-    "managed_by": {"terraform", "terragrunt", "helm", "argocd", "ansible", "manual-exception"},
-    "lifecycle": {"experimental", "active", "deprecated", "retired"},
-    "finops_allocation": {"direct", "shared", "platform", "security", "networking", "observability"},
-    "backup_required": {"true", "false"},
-    "dr_required": {"true", "false"},
-}
-
-NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-TF_LOCAL_NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
-TAG_LINE_RE = re.compile(r'^\s*([A-Za-z0-9_]+)\s*=\s*"?([^"\n#]+)"?\s*(?:#.*)?$')
+VALID_ENVIRONMENTS = {"dev", "qa", "prod"}
+VALID_LAYERS = {"foundation", "network", "platform", "data", "observability"}
+REQUIRED_TOP_LEVEL_DIRS = [".github/workflows", "ansible", "docs/standards", "policy", "scripts", "terraform"]
+REQUIRED_TERRAFORM_DIRS = ["backend", "globals", "live", "modules"]
+REQUIRED_MODULE_DOMAINS = ["foundation", "network", "platform", "data", "observability", "governance"]
+REQUIRED_LAYER_FILES = ["backend.tf", "main.tf", "outputs.tf", "providers.tf", "terraform.tfvars", "variables.tf"]
+REQUIRED_WORKFLOWS = ["validate-standards.yml", "deploy.yml"]
 RESOURCE_RE = re.compile(r'^\s*resource\s+"([^"]+)"\s+"([^"]+)"')
-NAME_ATTR_RE = re.compile(r'^\s*(name|bucket|identifier|cluster_identifier|queue_name|topic_name)\s*=\s*"([^"]+)"')
-TAGS_REF_RE = re.compile(r'tags\s*=\s*(?:var\.common_tags|local\.common_tags|merge\()')
-
-SKIP_RESOURCE_TAGS = {
-    "aws_ecr_lifecycle_policy",
-    "aws_iam_role_policy_attachment",
-    "aws_kms_alias",
-    "aws_route_table_association",
-    "aws_security_group_rule",
-    "aws_secretsmanager_secret_version",
-    "aws_sns_topic_subscription",
-    "aws_sqs_queue_policy",
-    "aws_vpc_endpoint_route_table_association",
-    "aws_vpc_endpoint_subnet_association",
-}
+TF_LOCAL_NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
+MODULE_SOURCE_RE = re.compile(r'source\s*=\s*"([^"]+)"')
 
 
-def parse_tfvars(path: Path) -> Dict[str, str]:
-    values: Dict[str, str] = {}
-    if not path.exists():
-        return values
-    for line in path.read_text(encoding="utf-8").splitlines():
-        m = TAG_LINE_RE.match(line)
-        if m:
-            values[m.group(1)] = m.group(2).strip().strip('"')
-    return values
+def rel(path: Path) -> str:
+    return str(path.relative_to(ROOT))
 
 
-def iter_tf_files() -> List[Path]:
-    return sorted(p for p in TERRAFORM_DIR.rglob("*.tf") if ".terraform" not in p.parts)
+def add_missing_dir_errors(errors: List[str], base: Path, dirs: Iterable[str]) -> None:
+    for directory in dirs:
+        path = base / directory
+        if not path.exists() or not path.is_dir():
+            errors.append(f"Missing required directory: {rel(path)}")
 
 
-def check_global_tags(errors: List[str], warnings: List[str]) -> None:
-    tag_file = TERRAFORM_DIR / "globals" / "tags.tfvars"
-    tags = parse_tfvars(tag_file)
-    if not tags:
-        errors.append(f"Missing or empty global tags file: {tag_file.relative_to(ROOT)}")
+def check_required_files(errors: List[str]) -> None:
+    required_files = [
+        ROOT / "README.md",
+        ROOT / "policy" / "terraform_standards.rego",
+        ROOT / "scripts" / "validate-standards.sh",
+        ROOT / "scripts" / "validate-standards.py",
+        ROOT / "scripts" / "deploy.sh",
+        ROOT / ".checkov.yml",
+    ]
+    for path in required_files:
+        if not path.exists() or not path.is_file():
+            errors.append(f"Missing required file: {rel(path)}")
+
+    for workflow in REQUIRED_WORKFLOWS:
+        path = ROOT / ".github" / "workflows" / workflow
+        if not path.exists() or not path.is_file():
+            errors.append(f"Missing required workflow: {rel(path)}")
+
+
+def check_module_domains(errors: List[str]) -> None:
+    modules_dir = TERRAFORM_DIR / "modules"
+    add_missing_dir_errors(errors, modules_dir, REQUIRED_MODULE_DOMAINS)
+
+    allowed = set(REQUIRED_MODULE_DOMAINS)
+    for child in modules_dir.iterdir() if modules_dir.exists() else []:
+        if child.is_dir() and child.name not in allowed:
+            errors.append(f"Module domain outside Landing Zone structure: {rel(child)}")
+
+    governance_readme = modules_dir / "governance" / "README.md"
+    if not governance_readme.exists():
+        errors.append(f"Governance module domain must contain a README because it is a policy/documentation domain: {rel(governance_readme)}")
+
+
+def check_live_structure(errors: List[str], workload: str, environment: str, layer: str) -> None:
+    live_dir = TERRAFORM_DIR / "live"
+    if not live_dir.exists():
+        errors.append(f"Missing live directory: {rel(live_dir)}")
         return
 
-    missing = sorted(REQUIRED_TAGS - set(tags))
-    if missing:
-        errors.append(f"terraform/globals/tags.tfvars is missing required tags: {', '.join(missing)}")
+    workload_dir = live_dir / workload
+    if not workload_dir.exists():
+        errors.append(f"Workload does not exist under terraform/live: {workload}")
+        return
 
-    for key, allowed in ALLOWED_VALUES.items():
-        if key in tags and tags[key] not in allowed:
-            errors.append(
-                f"terraform/globals/tags.tfvars has invalid value for {key}: '{tags[key]}'. Allowed: {', '.join(sorted(allowed))}"
-            )
+    env_dir = workload_dir / environment
+    if not env_dir.exists():
+        errors.append(f"Environment does not exist for workload {workload}: {environment}")
+        return
 
-    if tags.get("lifecycle") == "experimental" and "expiration_date" not in tags:
-        errors.append("Experimental resources must define expiration_date in common tags.")
-
-    if tags.get("environment") in {"prod", "prd"}:
-        if tags.get("backup_required") != "true":
-            errors.append("Production common tags must set backup_required=true.")
-        if tags.get("dr_required") != "true":
-            errors.append("Production common tags must set dr_required=true.")
-
-    if tags.get("finops_allocation") == "shared" and "allocation_rule" not in tags:
-        warnings.append("Shared cost resources should include allocation_rule to support FinOps showback/chargeback.")
-
-
-def check_layer_tfvars(errors: List[str], workload: str | None = None, environment: str | None = None, layer: str = "all") -> None:
-    pattern = "*/*/*/terraform.tfvars"
-    candidates = sorted((TERRAFORM_DIR / "live").glob(pattern))
-    for tfvars in candidates:
-        rel_parts = tfvars.relative_to(TERRAFORM_DIR / "live").parts
-        current_workload, current_environment, current_layer = rel_parts[0], rel_parts[1], rel_parts[2]
-        if workload and current_workload != workload:
+    layers = sorted(VALID_LAYERS) if layer == "all" else [layer]
+    for current_layer in layers:
+        layer_dir = env_dir / current_layer
+        if not layer_dir.exists():
+            errors.append(f"Layer directory does not exist: {rel(layer_dir)}")
             continue
-        if environment and current_environment != environment:
+        for required_file in REQUIRED_LAYER_FILES:
+            path = layer_dir / required_file
+            if not path.exists():
+                errors.append(f"Missing required layer file: {rel(path)}")
+
+
+def check_module_sources(errors: List[str]) -> None:
+    live_tf_files = sorted((TERRAFORM_DIR / "live").rglob("*.tf"))
+    for tf_file in live_tf_files:
+        content = tf_file.read_text(encoding="utf-8")
+        for source in MODULE_SOURCE_RE.findall(content):
+            if source.startswith("../") or source.startswith("./"):
+                resolved = (tf_file.parent / source).resolve()
+                if not resolved.exists():
+                    errors.append(f"Invalid local module source in {rel(tf_file)}: {source}")
+
+
+def check_terraform_local_labels(errors: List[str]) -> None:
+    for tf_file in sorted(TERRAFORM_DIR.rglob("*.tf")):
+        if ".terraform" in tf_file.parts:
             continue
-        if layer != "all" and current_layer != layer:
-            continue
-        values = parse_tfvars(tfvars)
-        missing = [k for k in ["environment", "domain", "application", "component"] if k not in values]
-        if missing:
-            errors.append(f"{tfvars.relative_to(ROOT)} is missing mandatory context variables: {', '.join(missing)}")
-
-
-def block_text(lines: List[str], start: int) -> Tuple[str, int]:
-    depth = 0
-    chunk = []
-    for i in range(start, len(lines)):
-        line = lines[i]
-        depth += line.count("{") - line.count("}")
-        chunk.append(line)
-        if i > start and depth <= 0:
-            return "\n".join(chunk), i
-    return "\n".join(chunk), len(lines) - 1
-
-
-def check_terraform_resources(errors: List[str], warnings: List[str]) -> None:
-    for path in iter_tf_files():
-        rel = path.relative_to(ROOT)
-        lines = path.read_text(encoding="utf-8").splitlines()
-        i = 0
-        while i < len(lines):
-            m = RESOURCE_RE.match(lines[i])
-            if not m:
-                i += 1
+        for line_number, line in enumerate(tf_file.read_text(encoding="utf-8").splitlines(), start=1):
+            match = RESOURCE_RE.match(line)
+            if not match:
                 continue
-
-            resource_type, local_name = m.group(1), m.group(2)
-            block, end = block_text(lines, i)
-            address = f"{rel}:{i + 1} resource.{resource_type}.{local_name}"
-
-            # Terraform local labels are code identifiers used in references. Underscores are valid and recommended here.
-            # Corporate naming conventions are enforced on the cloud resource name attributes below.
+            local_name = match.group(2)
             if not TF_LOCAL_NAME_RE.match(local_name):
-                errors.append(f"{address} has invalid Terraform local label '{local_name}'. Use letters, numbers and underscores only.")
+                errors.append(
+                    f"{rel(tf_file)}:{line_number} has invalid Terraform local label '{local_name}'. Use letters, numbers and underscores only."
+                )
 
-            name_matches = NAME_ATTR_RE.findall(block)
-            for attr, value in name_matches:
-                if "${" in value:
-                    continue
-                if not NAME_RE.match(value) and resource_type not in {"aws_cloudwatch_log_group", "aws_secretsmanager_secret"}:
-                    errors.append(f"{address} has invalid {attr}='{value}'. Use lowercase kebab-case.")
 
-            if resource_type not in SKIP_RESOURCE_TAGS and resource_type.startswith("aws_"):
-                if not TAGS_REF_RE.search(block) and "tags_all" not in block:
-                    warnings.append(f"{address} should use common tags through var.common_tags/local.common_tags/merge().")
-
-            i = end + 1
+def check_workflow_sarif_artifact(errors: List[str], warnings: List[str]) -> None:
+    workflow = ROOT / ".github" / "workflows" / "validate-standards.yml"
+    if not workflow.exists():
+        return
+    content = workflow.read_text(encoding="utf-8")
+    if "upload-sarif" not in content:
+        errors.append("validate-standards.yml must upload Checkov SARIF to GitHub Code Scanning.")
+    if "actions/upload-artifact" not in content or "checkov-results.sarif" not in content:
+        errors.append("validate-standards.yml must store checkov-results.sarif as a downloadable artifact.")
+    if "continue-on-error: true" in content and "soft_fail: true" in content:
+        warnings.append("Checkov is configured as advisory/soft-fail; corporate standards remain blocking.")
 
 
 def main() -> int:
@@ -177,28 +152,31 @@ def main() -> int:
     errors: List[str] = []
     warnings: List[str] = []
 
-    live_workload_path = TERRAFORM_DIR / "live" / args.workload
-    if not live_workload_path.exists():
-        errors.append(f"Workload does not exist under terraform/live: {args.workload}")
-    if args.environment not in {"dev", "qa", "prod"}:
+    if args.environment not in VALID_ENVIRONMENTS:
         errors.append("Environment must be one of: dev, qa, prod")
-    if args.layer not in {"all", "foundation", "network", "platform", "data", "observability"}:
+    if args.layer != "all" and args.layer not in VALID_LAYERS:
         errors.append("Layer must be one of: all, foundation, network, platform, data, observability")
 
-    check_global_tags(errors, warnings)
-    check_layer_tfvars(errors, args.workload, args.environment, args.layer)
-    check_terraform_resources(errors, warnings)
+    add_missing_dir_errors(errors, ROOT, REQUIRED_TOP_LEVEL_DIRS)
+    add_missing_dir_errors(errors, TERRAFORM_DIR, REQUIRED_TERRAFORM_DIRS)
+    check_required_files(errors)
+    check_module_domains(errors)
+    check_live_structure(errors, args.workload, args.environment, args.layer)
+    check_module_sources(errors)
+    check_terraform_local_labels(errors)
+    check_workflow_sarif_artifact(errors, warnings)
 
     for warning in warnings:
         print(f"::warning::{warning}")
 
     if errors:
-        print("\nStandards validation failed:\n", file=sys.stderr)
+        print("\nRepository structure validation failed:\n", file=sys.stderr)
         for error in errors:
             print(f"- {error}", file=sys.stderr)
         return 1
 
-    print("Standards validation passed.")
+    print("Repository structure validation passed.")
+    print("Corporate naming, tagging, FinOps and allowed-value policies are defined in policy/terraform_standards.rego.")
     return 0
 
 

@@ -20,7 +20,7 @@ fi
 echo "==> Terraform format normalization"
 terraform -chdir="$ROOT_DIR/terraform" fmt -recursive
 
-echo "==> Static corporate standards validation"
+echo "==> Repository structure validation"
 python3 "$ROOT_DIR/scripts/validate-standards.py" "$WORKLOAD" "$ENVIRONMENT" "$LAYER"
 
 for layer in "${layers[@]}"; do
